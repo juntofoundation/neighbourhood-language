@@ -1,4 +1,8 @@
-import type { Address, Expression, ExpressionAdapter, PublicSharing, IPFSNode, LanguageContext, AgentService, HolochainLanguageDelegate } from "@perspect3vism/ad4m";
+import type { Address, Expression, ExpressionAdapter, PublicSharing, LanguageContext, AgentService, HolochainLanguageDelegate } from "@perspect3vism/ad4m";
+import type { IPFS } from "ipfs-core-types";
+import { s3, BUCKET_NAME } from "./config";
+import { GetObjectAclCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import type { Readable } from "stream";
 //import { DNA_NICK } from "./dna";
 
 const _appendBuffer = (buffer1, buffer2) => {
@@ -15,7 +19,7 @@ const uint8ArrayConcat = (chunks) => {
 class SharedPerspectivePutAdapter implements PublicSharing {
   #agent: AgentService;
   //#hcDna: HolochainLanguageDelegate;
-  #IPFS: IPFSNode
+  #IPFS: IPFS;
 
   constructor(context: LanguageContext) {
     this.#agent = context.agent;
@@ -36,15 +40,36 @@ class SharedPerspectivePutAdapter implements PublicSharing {
     const agent = this.#agent;
     const expression = agent.createSignedExpression(neighbourhood);
     const content = JSON.stringify(expression);
-    const result = await this.#IPFS.add({ content });
+    const result = await this.#IPFS.add(
+      { content },
+      { onlyHash: true },
+    );
+    const hash = result.cid.toString();
+
+    const params = {
+      Bucket: BUCKET_NAME,
+      Key: hash,
+      Body: content,
+    };
+    const _res = await s3.send(new PutObjectCommand(params));
+
     // @ts-ignore
-    return result.cid.toString() as Address;
+    return hash as Address;
   }
+}
+
+async function streamToString(stream: Readable): Promise<string> {
+  return await new Promise((resolve, reject) => {
+    const chunks: Uint8Array[] = [];
+    stream.on('data', (chunk) => chunks.push(chunk));
+    stream.on('error', reject);
+    stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
+  })
 }
 
 export default class Adapter implements ExpressionAdapter {
   //#hcDna: HolochainLanguageDelegate;
-  #IPFS: IPFSNode
+  #IPFS: IPFS;
 
   putAdapter: PublicSharing;
 
@@ -57,15 +82,16 @@ export default class Adapter implements ExpressionAdapter {
   async get(address: Address): Promise<Expression> {
     const cid = address.toString();
 
-    const chunks = [];
-    // @ts-ignore
-    for await (const chunk of this.#IPFS.cat(cid)) {
-      chunks.push(chunk);
-    }
+    const params = {
+      Bucket: BUCKET_NAME,
+      Key: cid,
+    };
+    const data = await s3.send(new GetObjectAclCommand(params));
+    //@ts-ignore
+    const contents = await streamToString(data.Body as Readable);
+    
+    return JSON.parse(contents);
 
-    const fileString = uint8ArrayConcat(chunks).toString();
-    const fileJson = JSON.parse(fileString);
-    return fileJson;
     // const hash = Buffer.from(address, "hex");
     // const res = await this.#hcDna.call(
     //   DNA_NICK,
