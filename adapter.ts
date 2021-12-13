@@ -5,17 +5,6 @@ import { GetObjectAclCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import type { Readable } from "stream";
 //import { DNA_NICK } from "./dna";
 
-const _appendBuffer = (buffer1, buffer2) => {
-  const tmp = new Uint8Array(buffer1.byteLength + buffer2.byteLength);
-  tmp.set(new Uint8Array(buffer1), 0);
-  tmp.set(new Uint8Array(buffer2), buffer1.byteLength);
-  return tmp.buffer;
-};
-
-const uint8ArrayConcat = (chunks) => {
-  return chunks.reduce(_appendBuffer);
-};
-
 class SharedPerspectivePutAdapter implements PublicSharing {
   #agent: AgentService;
   //#hcDna: HolochainLanguageDelegate;
