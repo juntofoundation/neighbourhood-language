@@ -1,7 +1,7 @@
 import type { Address, Expression, ExpressionAdapter, PublicSharing, LanguageContext, AgentService, HolochainLanguageDelegate } from "@perspect3vism/ad4m";
 import type { IPFS } from "ipfs-core-types";
 import { s3, BUCKET_NAME } from "./config";
-import { GetObjectAclCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import type { Readable } from "stream";
 //import { DNA_NICK } from "./dna";
 
@@ -76,8 +76,7 @@ export default class Adapter implements ExpressionAdapter {
       Bucket: BUCKET_NAME,
       Key: cid,
     };
-    const data = await s3.send(new GetObjectAclCommand(params));
-    //@ts-ignore
+    const data = await s3.send(new GetObjectCommand(params));
     const contents = await streamToString(data.Body as Readable);
     
     return JSON.parse(contents);
