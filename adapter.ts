@@ -40,7 +40,8 @@ class SharedPerspectivePutAdapter implements PublicSharing {
       Key: hash,
       Body: content,
     };
-    const _res = await s3.send(new PutObjectCommand(params));
+    const res = await s3.send(new PutObjectCommand(params));
+    console.log("Create neighbourhood result: ", res);
 
     // @ts-ignore
     return hash as Address;
