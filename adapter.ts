@@ -4,6 +4,8 @@ import { s3, BUCKET_NAME } from "./config";
 import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import type { Readable } from "stream";
 //import { DNA_NICK } from "./dna";
+import axios from "axios";
+import https from "https";
 
 class SharedPerspectivePutAdapter implements PublicSharing {
   #agent: AgentService;
@@ -35,13 +37,17 @@ class SharedPerspectivePutAdapter implements PublicSharing {
     );
     const hash = result.cid.toString();
 
-    const params = {
-      Bucket: BUCKET_NAME,
-      Key: hash,
-      Body: content,
+    const httpsAgent = new https.Agent({
+      rejectUnauthorized: false
+    });
+    const postData = {
+      hash,
+      content,
     };
-    const res = await s3.send(new PutObjectCommand(params));
-    console.log("Create neighbourhood result: ", res);
+    const postResult = await axios.post("https://bi8fgdofma.execute-api.us-west-2.amazonaws.com/dev/serverlessSetup/upload", postData, { httpsAgent });
+    if (postResult.status != 200) {
+      console.error("Create neighbourhood error: ", postResult);
+    }
 
     // @ts-ignore
     return hash as Address;
@@ -72,14 +78,16 @@ export default class Adapter implements ExpressionAdapter {
   async get(address: Address): Promise<Expression> {
     const cid = address.toString();
 
-    const params = {
-      Bucket: BUCKET_NAME,
-      Key: cid,
-    };
-    const data = await s3.send(new GetObjectCommand(params));
-    const contents = await streamToString(data.Body as Readable);
-    
-    return JSON.parse(contents);
+    const httpsAgent = new https.Agent({
+      rejectUnauthorized: false
+    });
+    const getResult = await axios.get(`https://bi8fgdofma.execute-api.us-west-2.amazonaws.com/dev/flux-files/get?hash=${cid}`);
+    if (getResult.status != 200) {
+      console.error("Create neighbourhood error: ", getResult);
+    }
+
+    console.log("Create neighbourhood data: ", getResult.data);
+    return JSON.parse(getResult.data);
 
     // const hash = Buffer.from(address, "hex");
     // const res = await this.#hcDna.call(
