@@ -61,6 +61,6 @@ export default class Adapter implements ExpressionAdapter {
     }
 
     console.log("Create neighbourhood data: ", getResult.data);
-    return JSON.parse(getResult.data);
+    return getResult.data;
   }
 }
