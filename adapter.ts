@@ -2,7 +2,9 @@ import type { Address, Expression, ExpressionAdapter, PublicSharing, LanguageCon
 import type { IPFS } from "ipfs-core-types";
 import axios from "axios";
 import https from "https";
-import { GET_ENDPOINT, UPLOAD_ENDPOINT } from "./config";
+import { BUCKET_NAME, s3, UPLOAD_ENDPOINT } from "./config";
+import type { Readable } from "stream";
+import { GetObjectCommand } from "@aws-sdk/client-s3";
 
 class SharedPerspectivePutAdapter implements PublicSharing {
   #agent: AgentService;
@@ -40,6 +42,14 @@ class SharedPerspectivePutAdapter implements PublicSharing {
   }
 }
 
+async function streamToString(stream: Readable): Promise<string> {
+  return await new Promise((resolve, reject) => {
+    const chunks: Uint8Array[] = [];
+    stream.on('data', (chunk) => chunks.push(chunk));
+    stream.on('error', reject);
+    stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
+  })
+}
 export default class Adapter implements ExpressionAdapter {
   #IPFS: IPFS;
 
@@ -53,15 +63,14 @@ export default class Adapter implements ExpressionAdapter {
   async get(address: Address): Promise<Expression> {
     const cid = address.toString();
 
-    const httpsAgent = new https.Agent({
-      rejectUnauthorized: false
-    });
-    const getResult = await axios.get(`${GET_ENDPOINT}?hash=${cid}`);
-    if (getResult.status != 200) {
-      console.error("Create neighbourhood error: ", getResult);
-    }
+    const params = {
+      Bucket: BUCKET_NAME,
+      Key: cid,
+    };
 
-    console.log("Create neighbourhood data: ", getResult.data);
-    return getResult.data;
+    const response = await s3.send(new GetObjectCommand(params));
+    const contents = await streamToString(response.Body as Readable);
+
+    return JSON.parse(contents);
   }
 }
